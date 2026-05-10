@@ -1,0 +1,12 @@
+{
+  "name": "autoposter-legal-pages",
+  "version": "1.0.0",
+  "description": "Public Terms of Service and Privacy Policy pages for Autoposter GG",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.18.3"
+  }
+}
