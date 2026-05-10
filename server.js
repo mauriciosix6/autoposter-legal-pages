@@ -1,6 +1,13 @@
 const express = require("express");
+const path = require("path");
 
 const app = express();
+
+app.use("/terms", express.static(path.join(__dirname, "public", "terms")));
+
+app.get("/terms/tiktokNdMTmqniArnbujYZkAcm5fFEOjdV8Qt2.txt", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "terms", "tiktokNdMTmqniArnbujYZkAcm5fFEOjdV8Qt2.txt"));
+});
 
 const APP_NAME = "Autoposter GG";
 const LAST_UPDATED = "10/05/2026";
