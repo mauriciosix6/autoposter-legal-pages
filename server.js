@@ -1,12 +1,18 @@
 const express = require("express");
 const path = require("path");
+const fs = require("fs");
 
 const app = express();
 
 app.use("/terms", express.static(path.join(__dirname, "public", "terms")));
+app.use("/privacy", express.static(path.join(__dirname, "public", "privacy")));
 
-app.get("/terms/tiktokNdMTmqniArnbujYZkAcm5fFEOjdV8Qt2.txt", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "terms", "tiktokNdMTmqniArnbujYZkAcm5fFEOjdV8Qt2.txt"));
+app.get("/terms/:fileName", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "terms", req.params.fileName));
+});
+
+app.get("/privacy/:fileName", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "privacy", req.params.fileName));
 });
 
 const APP_NAME = "Autoposter GG";
