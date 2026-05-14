@@ -1,12 +1,21 @@
 const express = require("express");
 const path = require("path");
 
-console.log("SERVER AUTOPOSTER GG COM /desktop, /terms E /privacy CARREGADO");
+console.log("SERVER AUTOPOSTER GG COM /desktop, /terms, /privacy E VERIFICACAO TIKTOK CARREGADO");
 
 const app = express();
 
 const APP_NAME = "Autoposter GG";
 const LAST_UPDATED = "10/05/2026";
+const TIKTOK_SITE_VERIFICATION_TEXT = "tiktok-developers-site-verification=tgHjEBEFHt1nSfmUEbVnprMiY7yCSX9L";
+
+function sendTikTokVerification(req, res) {
+  res
+    .status(200)
+    .type("text/plain; charset=utf-8")
+    .send(TIKTOK_SITE_VERIFICATION_TEXT);
+}
+
 function normalizeOrigin(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -33,6 +42,21 @@ function getOfficialSiteUrl(req) {
 function getWebRedirectUri(req) {
   return `${getSiteOrigin(req)}/tiktok/callback`;
 }
+
+// Verificação TikTok - texto puro, sem HTML.
+// Use a URL exata que o TikTok solicitar. A principal para Terms é:
+// https://SEU-DOMINIO/terms/tiktok-developers-site-verification.txt
+app.get("/tiktok-developers-site-verification.txt", sendTikTokVerification);
+app.get("/tiktok-developers-site-verification", sendTikTokVerification);
+
+app.get("/terms/tiktok-developers-site-verification.txt", sendTikTokVerification);
+app.get("/terms/tiktok-developers-site-verification", sendTikTokVerification);
+
+app.get("/privacy/tiktok-developers-site-verification.txt", sendTikTokVerification);
+app.get("/privacy/tiktok-developers-site-verification", sendTikTokVerification);
+
+app.get("/desktop/tiktok-developers-site-verification.txt", sendTikTokVerification);
+app.get("/desktop/tiktok-developers-site-verification", sendTikTokVerification);
 
 // Arquivos de verificação TikTok
 app.use("/terms", express.static(path.join(__dirname, "public", "terms")));
