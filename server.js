@@ -7,7 +7,32 @@ const app = express();
 
 const APP_NAME = "Autoposter GG";
 const LAST_UPDATED = "10/05/2026";
-const OFFICIAL_SITE_URL = process.env.OFFICIAL_SITE_URL || "https://autoposter-api-production.up.railway.app/desktop";
+function normalizeOrigin(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  const withProtocol = raw.startsWith("http://") || raw.startsWith("https://")
+    ? raw
+    : `https://${raw}`;
+  return withProtocol.replace(/\/$/, "");
+}
+
+function getSiteOrigin(req) {
+  // No hardcoded domain: Railway custom domain, Railway public domain, or request host.
+  return normalizeOrigin(
+    process.env.PUBLIC_BASE_URL ||
+    process.env.OFFICIAL_SITE_ORIGIN ||
+    process.env.RAILWAY_PUBLIC_DOMAIN ||
+    (req ? `${req.protocol}://${req.get("host")}` : "")
+  );
+}
+
+function getOfficialSiteUrl(req) {
+  return `${getSiteOrigin(req)}/desktop`;
+}
+
+function getWebRedirectUri(req) {
+  return `${getSiteOrigin(req)}/tiktok/callback`;
+}
 
 // Arquivos de verificação TikTok
 app.use("/terms", express.static(path.join(__dirname, "public", "terms")));
@@ -35,7 +60,8 @@ function escapeHtml(value) {
     .replace(/'/g, "&#039;");
 }
 
-function desktopPage() {
+function desktopPage(req) {
+  const officialSiteUrl = getOfficialSiteUrl(req);
   return `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -351,7 +377,7 @@ function desktopPage() {
       <p class="note">
         This page supports a simplified desktop test environment for TikTok review.
         The same app name, <b>${APP_NAME}</b>, appears in the desktop app, website,
-        Privacy Policy, and Terms of Service. The official desktop page URL is <code>${OFFICIAL_SITE_URL}</code>.
+        Privacy Policy, and Terms of Service. The official desktop page URL is <code>${officialSiteUrl}</code>.
       </p>
       <div class="steps">
         <div class="step"><b>1. Open desktop app</b><br />The user opens ${APP_NAME} and selects a local profile.</div>
@@ -447,17 +473,70 @@ function legalPage(title, subtitle, content) {
 </html>`;
 }
 
+
+function webCallbackPage(req) {
+  const code = typeof req.query.code === "string" && req.query.code.trim() ? req.query.code.trim() : "received-after-authorization";
+  const state = typeof req.query.state === "string" && req.query.state.trim() ? req.query.state.trim() : "not provided";
+  const error = typeof req.query.error === "string" && req.query.error.trim() ? req.query.error.trim() : "";
+  const errorDescription = typeof req.query.error_description === "string" && req.query.error_description.trim() ? req.query.error_description.trim() : "";
+
+  const statusTitle = error ? "TikTok Authorization Error" : "TikTok Web Redirect Received";
+  const statusText = error
+    ? "TikTok returned an authorization error to the registered Web Redirect URI."
+    : "TikTok redirected back to the registered Web Redirect URI successfully.";
+
+  return legalPage(
+    `${APP_NAME} - TikTok Web Redirect URI`,
+    `Official HTTPS callback endpoint for TikTok Login Kit review`,
+    `
+      <p><b>${APP_NAME}</b> provides this HTTPS callback endpoint as the registered <b>Web Redirect URI</b> for TikTok Login Kit review.</p>
+      <p>This route confirms that the application owns a public web callback URL that matches the official website and app name.</p>
+
+      <h2>${escapeHtml(statusTitle)}</h2>
+      <p>${escapeHtml(statusText)}</p>
+
+      <h2>Callback details</h2>
+      <p><b>Registered Web Redirect URI:</b> <code>${escapeHtml(getWebRedirectUri(req))}</code></p>
+      <p><b>Authorization code:</b> <code>${escapeHtml(code ? "received" : "not received")}</code></p>
+      <p><b>State:</b> <code>${escapeHtml(state)}</code></p>
+      ${error ? `<p><b>Error:</b> <code>${escapeHtml(error)}</code></p>` : ""}
+      ${errorDescription ? `<p><b>Error description:</b> ${escapeHtml(errorDescription)}</p>` : ""}
+
+      <h2>Desktop application behavior</h2>
+      <p><b>${APP_NAME}</b> is a desktop application. In the production desktop flow, the user starts TikTok Login Kit inside the desktop app, and the app receives the OAuth response through its local desktop callback while the app is running.</p>
+      <p>The desktop callback used by the app is <code>http://127.0.0.1:8787/tiktok/callback</code>. This local address is not a public website; it only works on the user's own computer during the Login Kit flow.</p>
+
+      <h2>TikTok scopes demonstrated</h2>
+      <ul>
+        <li><code>user.info.basic</code> — identifies the authorized TikTok account.</li>
+        <li><code>video.list</code> — loads public videos from the authorized TikTok profile.</li>
+        <li><code>video.upload</code> — starts the upload flow for a user-selected video.</li>
+        <li><code>video.publish</code> — completes the Direct Post publishing flow.</li>
+      </ul>
+
+      <h2>Official pages</h2>
+      <p><a href="/desktop">${APP_NAME} - Desktop Application</a></p>
+      <p><a href="/privacy">Privacy Policy for ${APP_NAME}</a></p>
+      <p><a href="/terms">Terms of Service for ${APP_NAME}</a></p>
+    `
+  );
+}
+
+app.get("/tiktok/callback", (req, res) => {
+  res.type("html").send(webCallbackPage(req));
+});
+
 app.get("/", (req, res) => {
   res.redirect("/desktop");
 });
 
 app.get("/desktop", (req, res) => {
-  res.type("html").send(desktopPage());
+  res.type("html").send(desktopPage(req));
 });
 
 app.get("/terms", (req, res) => {
   res.type("html").send(legalPage(
-    `Terms of Service ${APP_NAME}`,
+    `Terms of Service for ${APP_NAME}`,
     `Last updated: ${LAST_UPDATED}`,
     `
       <p>These Terms of Service apply to the use of <b>${APP_NAME}</b>. The page title intentionally displays the application name exactly as <b>${APP_NAME}</b> for TikTok review.</p>
@@ -498,7 +577,7 @@ app.get("/terms", (req, res) => {
 
 app.get("/privacy", (req, res) => {
   res.type("html").send(legalPage(
-    `Privacy Policy ${APP_NAME}`,
+    `Privacy Policy for ${APP_NAME}`,
     `Last updated: ${LAST_UPDATED}`,
     `
       <p>This Privacy Policy explains how <b>${APP_NAME}</b> handles user data. The page title intentionally displays the application name exactly as <b>${APP_NAME}</b> for TikTok review.</p>
